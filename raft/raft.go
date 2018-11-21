@@ -55,6 +55,8 @@ type Raft struct {
 	// Your data here (Lab1, Lab2, Challenge1).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	
+	// Data for Lab1
 	currentTerm	int
 	votedFor	int
 	state 		int 	// 1: leader, 2: follower, 3: candidate	
@@ -63,6 +65,18 @@ type Raft struct {
 	newLeaderCh	chan bool
 	grantVoteCh	chan bool
 
+	// Data for Lab2
+	commitIndex  int 	// index of highest log entry known to be committed
+	LastApplied  int 	// index of highest log entry applied to state machine
+
+	// nextIndex[]  int
+	// matchIndex[] int
+
+}
+
+// Data type used in Lab 2
+type Log struct {
+	Term int
 }
 
 
@@ -128,8 +142,13 @@ func (rf *Raft) readPersist(data []byte) {
 //
 type RequestVoteArgs struct {
 	// Your data here (Lab1, Lab2).
-	Term		int
-	CandidateId	int
+	// Data for Lab1
+	Term		 int
+	CandidateId	 int
+
+	// Data for Lab2
+	LastLogIndex int
+	LastLogTerm	 int
 }
 
 //
@@ -238,8 +257,15 @@ func (rf *Raft) isMajority() bool {
 // Lab1: AppendEntries RPC arguments structure.
 // 
 type AppendEntriesArgs struct {
+	// Data for Lab1
 	Term 		int
 	LeaderId	int
+
+	// Data for Lab2
+	PrevLogIndex int
+	PrevLogTerm  int
+	Entries[]	 Log
+	LeaderCommit int
 }
 
 // 
@@ -351,6 +377,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.heartBeatCh = make(chan bool)
 	rf.newLeaderCh = make(chan bool)
 	rf.grantVoteCh = make(chan bool)
+
+	rf.commitIndex = 0
+	rf.LastApplied = 0
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
