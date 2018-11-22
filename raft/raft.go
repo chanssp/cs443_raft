@@ -66,17 +66,19 @@ type Raft struct {
 	grantVoteCh	chan bool
 
 	// Data for Lab2
+	log[]		 Log 	// log entries
 	commitIndex  int 	// index of highest log entry known to be committed
-	LastApplied  int 	// index of highest log entry applied to state machine
+	lastApplied  int 	// index of highest log entry applied to state machine
 
-	// nextIndex[]  int
-	// matchIndex[] int
+	nextIndex[]  int
+	matchIndex[] int
 
 }
 
 // Data type used in Lab 2
 type Log struct {
-	Term int
+	Term 	int
+	Command interface{}
 }
 
 
@@ -186,8 +188,16 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		reply.VoteGranted = true
 		rf.state = 2
 		rf.grantVoteCh <- reply.VoteGranted
+	default:
+		// this part of the code is brought from example code for Lab1
+		reply.Term = candTerm
+		if rf.votedFor == -1 || rf.votedFor == candId {
+			reply.VoteGranted = true
+			rf.votedFor = candId
+		} else {
+			reply.VoteGranted = false
+		}
 	}
-
 }
 
 
@@ -277,7 +287,8 @@ type AppendEntriesReply struct {
 }
 
 // 
-// Lab1: AppendEntries RPC handler
+// Lab1: AppendEntries RPC handler - used as heartbeat
+// Lab2: Invoked by leader to replicate log entries
 // 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	var leaderTerm int
@@ -336,6 +347,21 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	isLeader := true
 
 	// Your code here (Lab2).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	term, isLeader = rf.GetState()
+	// fmt.Printf("term: %d, isLeader: %t\n", term, isLeader)
+
+	if isLeader {
+		var newEntry Log
+
+		newEntry.Term = term
+		newEntry.Command = command
+
+		rf.log = append(rf.log, newEntry)
+		index = len(rf.log) + 1
+	} 
 
 	return index, term, isLeader
 }
@@ -379,7 +405,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.grantVoteCh = make(chan bool)
 
 	rf.commitIndex = 0
-	rf.LastApplied = 0
+	rf.lastApplied = 0
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
